@@ -1,0 +1,147 @@
+#!/bin/zsh
+# gomodel — modelos de tu plan OpenCode Go, ordenados por potencia.
+#
+#   gomodel                     lista los modelos con su tope mensual (tu plan: Go Plus 40 USD)
+#   gomodel uso                 cuánto te queda de tu cuota Go (5 h / semana / mes)
+#   gomodel menu                menú interactivo de selección
+#   gomodel <n|id> "prompt"     ejecuta opencode con ese modelo
+#   gomodel go                  lo mismo, con los topes del plan Go (10 USD)
+#
+# Tope mensual y peticiones estimadas por modelo (docs oficial de OpenCode Go).
+# Regla: 5 h = 20% del tope mensual, semana = 50%, mes = 100%.
+
+PLAN="${GOMODEL_PLAN:-plus}"   # plus | go
+
+MODELOS=(
+"1|kimi-k3.1-pro|Kimi K3.1 Pro|S|60|2941|15|735"
+"2|gemini-4-argon|Gemini 4 Argon (50% dto. hasta 30-nov)|S|120|8480|30|2120"
+"3|grok-4.7|Grok 4.7|S|60|3380|15|845"
+"4|qwen3.8-max|Qwen3.8 Max|S|60|3240|15|810"
+"5|glm-5.3|GLM-5.3|S|120|8640|15|1080"
+"6|deepseek-v4-pro|DeepSeek V4 Pro|A|60|20800|15|5200"
+"7|kimi-k2.7-code|Kimi K2.7 Code (código)|A|180|20250|60|6750"
+"8|step-5-preview|Step 5 Preview|A|60|8520|15|2130"
+"9|hy4-preview|Hy4 preview|A|120|27080|30|6770"
+"10|qwen3.7-plus|Qwen3.7 Plus|A|180|64800|60|21600"
+"11|minimax-m3|MiniMax M3 (512K ctx)|A|180|48000|60|16000"
+"12|longcat-2.0|LongCat-2.0|A|240|228800|60|57200"
+"13|glm-5.3-flash|GLM-5.3-Flash|B|180|94740|60|31580"
+"14|qwen3.8-flash|Qwen3.8 Flash|B|90|81000|30|27000"
+"15|deepseek-v4.1-flash|DeepSeek V4.1 Flash|B|160|346670|80|173330"
+"16|minimax-m3.1-flash|MiniMax M3.1 Flash|B|80|77520|20|19380"
+"17|claude-haiku-5-5|Claude Haiku 5.5|B|60|76920|15|19230"
+"18|gpt-6-luna|GPT 6 Luna|B|60|84520|15|21130"
+"19|mimo-v2.5-pro|MiMo V2.5 Pro|B|60|65200|15|16300"
+"20|muse-spark-1.3-contributor|Muse Spark 1.3 Contributor|B|120|453200|60|226600"
+"21|mimo-v2.6-flash|MiMo V2.6 Flash|B|120|300800|60|150400"
+"22|mimo-v2.5|MiMo V2.5|B|120|300800|60|150400"
+"23|beam-free|Beam Free|gratis|ilimitado|ilimitado|ilimitado|ilimitado"
+"24|iceman-contributor-free|Iceman Contributor Free|gratis|ilimitado|ilimitado|ilimitado|ilimitado"
+)
+
+if [[ "$PLAN" == "go" ]]; then IDX=6; LAB="plan Go (10 USD)"; else IDX=5; LAB="plan Go Plus (40 USD)"; fi
+
+lista() {
+  echo "MODELOS OPENCODE GO — por potencia · $LAB"
+  echo
+  printf "%-4s %-30s %-6s %-14s %s\n" "Nº" "MODELO (opencode-go/…)" "TIER" "TOPE/MES" "PETICIONES/MES"
+  for f in "${MODELOS[@]}"; do
+    # orden de campos: n|id|nombre|tier|tope Plus|peticiones Plus|tope Go|peticiones Go
+    IFS='|' read -r n id nom tier capP reqP capG reqG <<<"$f"
+    if [[ "$PLAN" == "go" ]]; then cap="$capG"; req="$reqG"; else cap="$capP"; req="$reqP"; fi
+    [[ "$cap" == <-> ]] && cap="\$$cap"
+    printf "%-4s %-30s %-6s %-14s %s\n" "$n" "$id" "$tier" "$cap" "$req"
+  done
+  echo
+  echo "S = máximo nivel   A = muy potente   B = rápido/barato   gratis = sin límite"
+  echo "5 h = 20% del tope · semana = 50% · mes = 100% (por modelo)"
+}
+
+uso() {
+  opencode api get /api/experimental/usage/limits 2>/dev/null | python3 -c '
+import json,sys,datetime
+d=json.load(sys.stdin,strict=False)["data"]
+go=d.get("go") or {}
+def show(k,label):
+    m=go.get(k)
+    if not m: return
+    r=datetime.datetime.fromtimestamp(m["resetsAt"]/1000).strftime("%d-%m %H:%M")
+    flag="  ¡BLOQUEADO!" if m.get("limited") else ""
+    print(f"{label:<10} {m['"'"'percent'"'"']:>5.0f}% usado  →  {100-m['"'"'percent'"'"']:>5.0f}% disponible   (se reinicia {r}){flag}")
+print("CUOTA GO DE TU WORKSPACE")
+show("rolling","5 horas")
+show("weekly","semana")
+show("monthly","mes")
+b=d.get("budgets") or []
+if b:
+    print("\nPRESUPUESTOS POR MODELO:")
+    for x in b:
+        print(f"  {x['"'"'id'"'"']}: gastado ${x['"'"'spent'"'"']:.2f} de ${x['"'"'limit'"'"']:.2f}")
+else:
+    print("\nSin presupuestos por modelo: el % de arriba es el total de la cuota,")
+    print("no el desglose por modelo (la API local no lo expone).")
+    print("Para verlo por modelo: Console > Activity/Billing, o crea budgets en")
+    print("Settings > Budgets (con per=model) y aparecerán aquí.")
+'
+}
+
+id_de() {
+  local arg="$1"
+  if [[ "$arg" == <-> ]]; then
+    for f in "${MODELOS[@]}"; do
+      IFS='|' read -r n id _ <<<"$f"
+      [[ "$n" == "$arg" ]] && { echo "$id"; return 0; }
+    done
+    return 1
+  fi
+  for f in "${MODELOS[@]}"; do
+    IFS='|' read -r _ id _ <<<"$f"
+    [[ "$id" == "$arg" ]] && { echo "$id"; return 0; }
+  done
+  return 1
+}
+
+case "${1:-}" in
+  ""|-l|--list|lista)
+    lista
+    ;;
+  go|plus)
+    PLAN="$1"
+    if [[ "$1" == "go" ]]; then IDX=6; LAB="plan Go (10 USD)"; else IDX=5; LAB="plan Go Plus (40 USD)"; fi
+    lista
+    ;;
+  uso|usage|cuota)
+    uso
+    ;;
+  menu)
+    labels=()
+    for f in "${MODELOS[@]}"; do
+      IFS='|' read -r n id nom tier _ <<<"$f"
+      labels+=("$n. $nom  [$tier]")
+    done
+    echo "Elige un modelo:" >&2
+    pick=""
+    select l in "${labels[@]}"; do
+      [[ -n "$l" ]] && { pick="$l"; break; }
+    done
+    idx="${pick%%.*}"
+    IFS='|' read -r _ fid _ <<<"${MODELOS[$idx]}"
+    shift
+    echo "→ opencode-go/$fid" >&2
+    exec opencode run --model "opencode-go/$fid" "$@"
+    ;;
+  -h|--help|help)
+    sed -n '2,12p' "$0"
+    ;;
+  *)
+    id="$(id_de "$1")" || { echo "Modelo no válido: $1  (usa 'gomodel' para ver la lista)" >&2; exit 1; }
+    shift
+    if [[ $# -eq 0 ]]; then
+      echo "opencode-go/$id"
+      echo 'Úsalo así:  opencode run --model "opencode-go/<id>" "tu prompt"'
+      echo '        o en la TUI:  /models   y elige  opencode-go/'"$id"
+      exit 0
+    fi
+    exec opencode run --model "opencode-go/$id" "$@"
+    ;;
+esac

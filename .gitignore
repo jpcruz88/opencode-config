@@ -1,0 +1,13 @@
+# Nunca subir: credenciales locales
+service.json
+auth.json
+*.db
+*.db-shm
+*.db-wal
+
+# Sistema
+.DS_Store
+
+# Overrides locales (si algún día haces uno)
+*.local.json
+*.local.jsonc

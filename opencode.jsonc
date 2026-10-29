@@ -1,0 +1,33 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+
+  // Enrutado automático por complejidad (plugin local).
+  // Gestiona: kimi-k3.1-pro / kimi-k2.7-code / glm-5.3-flash
+  // Si eliges un modelo fuera de esa familia, el plugin no lo toca.
+  // Relativo a este archivo → el repo se puede clonar en ~/.config/opencode de cualquier máquina.
+  "plugins": ["./plugins/auto-model"],
+
+  // El agente de búsqueda/relectura trabaja con el modelo barato automáticamente.
+  "agents": {
+    "explore": { "model": "opencode-go/glm-5.3-flash" }
+  },
+
+  // Atajos para forzar un modelo concreto sin salir del teclado.
+  "commands": {
+    "potente": {
+      "description": "Modelo máximo (Kimi K3.1 Pro) para tareas difíciles",
+      "template": "$ARGUMENTS",
+      "model": "opencode-go/kimi-k3.1-pro"
+    },
+    "codigo": {
+      "description": "Modelo de código (Kimi K2.7 Code) — uso diario",
+      "template": "$ARGUMENTS",
+      "model": "opencode-go/kimi-k2.7-code"
+    },
+    "flash": {
+      "description": "Modelo barato y rápido (GLM-5.3-Flash)",
+      "template": "$ARGUMENTS",
+      "model": "opencode-go/glm-5.3-flash"
+    }
+  }
+}
