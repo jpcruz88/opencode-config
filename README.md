@@ -10,6 +10,7 @@ Pensada para clonarse directamente en `~/.config/opencode` de cualquier Mac.
 |---|---|
 | `opencode.jsonc` | Config global: plugin del router, agente `explore` barato y comandos `/potente` `/codigo` `/flash` |
 | `plugins/auto-model/index.ts` | Router: clasifica cada mensaje y cambia el modelo antes de arrancar el turno |
+| `plugins/auto-model/tui.tsx` | Barra de estado en el footer: cuota Go con reinicios, modelo y coste |
 | `bin/gomodel` | Selector de modelos de Go con topes/peticiones por modelo y consulta de cuota |
 
 No incluye credenciales: `service.json` (contraseña local) y los tokens de `~/.local/share/opencode/` quedan fuera con `.gitignore`.
@@ -63,6 +64,29 @@ Verificación hecha:
 **Desactivarlo**: borra la línea `plugins` de `opencode.jsonc`.
 
 **Cambiar los modelos**: edita `ROUTES` arriba del todo en `plugins/auto-model/index.ts`.
+
+## Barra de estado en el footer
+
+`plugins/auto-model/tui.tsx` añade una línea al footer de la TUI, tanto en la pantalla de inicio como dentro de una sesión:
+
+```
+▪ Go 82% 5h ↳20:12 (2 h 0 m) · 70% sem ↳1/11 · 35% mes ↳27/11  │  kimi-k3.1-pro  │  $0.42
+```
+
+| Fragmento | Significado |
+|---|---|
+| `Go 82% 5h ↳20:12 (2 h 0 m)` | Cuota de la ventana de 5 h gastada y cuándo se reinicia (5 h = 20% del tope mensual de cada modelo) |
+| `70% sem ↳1/11 · 35% mes ↳27/11` | Semana y mes gastados con su fecha de reinicio |
+| `kimi-k3.1-pro` | Modelo de la sesión |
+| `$0.42` | Coste acumulado de la sesión |
+
+El **uso de contexto** no se duplica: OpenCode ya lo pinta en su propio footer (por ejemplo `238.4K (23%)`).
+
+Los datos se cargan antes de registrar los slots y se refrescan cada 60 s. Si la TUI ya estaba abierta al guardar, ejecuta `/reload` (o reiníciala).
+
+**Diagnóstico**: `OPENCODE_STATUS_DEBUG=1 opencode` escribe `/tmp/status-debug.log` con cada render y cada fallo de la barra.
+
+**Implementación**: el estado vive en variables normales, no en signals de Solid — un plugin local resuelve otro `solid-js` que el renderizador, y las signals no redibujaban la barra.
 
 ## Comandos
 
